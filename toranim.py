@@ -1,9 +1,11 @@
 import openpyxl
-from tkinter import *
+import tkinter as tk
 from tkinter import ttk
-from docx import Document, enum
+from docx import Document
+from datetime import datetime
 
 FOLDER = 'C:/Users/user/Desktop/toranim/'
+VERSIONS_FOLDER = 'גרסאות קודמות של האקסל'
 TABLE_SIZE = 9 # x9
 # shishi, regular
 TABLE_CELLS = '''13, 14, 22, 23
@@ -46,6 +48,7 @@ class Excel:
         return ''
     
     def update(self, toranim_data):
+        self.wb.save(f'{FOLDER}{VERSIONS_FOLDER}/{datetime.now().strftime("%m-%d-%Y_%H-%M-%S")}.xlsx')
         for i, name in enumerate(toranim_data):
             self.ws.cell(i+2, 3).value = toranim_data[name][0]
             self.ws.cell(i+2, 4).value = toranim_data[name][1]
@@ -53,11 +56,11 @@ class Excel:
 
 
 class Tkinter:
-    root = Tk()
+    root = tk.Tk()
     @classmethod
     def start(cls):
         cls.root.title('שיבוץ תורנים')
-        frame = Frame(cls.root, padx=60, pady=60)
+        frame = tk.Frame(cls.root, padx=60, pady=60)
         frame.pack()
         c = Calculate()
         ttk.Button(frame, text='סבב רגיל', command=lambda: c.regular_sevev()).pack()
@@ -70,24 +73,24 @@ class Tkinter:
 
     @classmethod
     def add_special_sevev(cls):
-        frame = Frame(cls.root, padx=60, pady=60)
+        frame = tk.Frame(cls.root, padx=60, pady=60)
         frame.pack()
-        label = Label(frame, text='תורנות רגילה:')
+        label = tk.Label(frame, text='תורנות רגילה:')
         label.pack()
-        textvar = StringVar(frame)
+        textvar = tk.StringVar(frame)
         textvar.set('38')
-        spinbox = Spinbox(frame, from_=0, to=50,
+        spinbox = ttk.Spinbox(frame, from_=0, to=50,
         textvariable=textvar)
         spinbox.pack()
-        label = Label(frame, text='תורנות שישי:')
+        label = tk.Label(frame, text='תורנות שישי:')
         label.pack()
-        textvar1 = StringVar(frame)
+        textvar1 = tk.StringVar(frame)
         textvar1.set('8')
-        spinbox = Spinbox(frame, from_=0, to=50,
+        spinbox = ttk.Spinbox(frame, from_=0, to=50,
         textvariable=textvar1)
         spinbox.pack()
         c = Calculate()
-        Button(frame, text='סבבה',
+        ttk.Button(frame, text='סבבה',
             command=lambda: c.calculate(
             int(textvar.get()), int(textvar1.get()))).pack()
 
