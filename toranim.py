@@ -5,7 +5,7 @@ from docx import Document
 from datetime import datetime
 
 FOLDER = 'C:/Users/user/Desktop/toranim/'
-VERSIONS_FOLDER = 'גרסאות קודמות של האקסל'
+VERSIONS_FOLDER = 'versions'
 TABLE_SIZE = 9 # x9
 # shishi, regular
 TABLE_CELLS = '''13, 14, 22, 23
