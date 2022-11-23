@@ -22,9 +22,9 @@ TABLE_CELLS = '''13, 14, 22, 23
 
 class Excel:
     def __init__(self, filename):
-        wb = openpyxl.load_workbook(FOLDER + filename)
-        self.ws = wb.active
-        self.toranim_data = {}
+        self.wb = openpyxl.load_workbook(FOLDER + filename)
+        self.ws = self.wb.active
+        self.toranim_data = {} # {name: [all, shishi]}
         self.havruta_data = []
     
     def extract(self):
@@ -44,6 +44,12 @@ class Excel:
             elif name == i[1]:
                 return i[0]
         return ''
+    
+    def update(self, toranim_data):
+        for i, name in enumerate(toranim_data):
+            self.ws.cell(i+2, 3).value = toranim_data[name][0]
+            self.ws.cell(i+2, 4).value = toranim_data[name][1]
+        self.wb.save(FOLDER+'try.xlsx')
 
 
 class Tkinter:
@@ -142,7 +148,7 @@ class Calculate:
         self.regular_count, self.shishi_count = regular_count, shishi_count
         self.united_min_list = self.get_united_min_list()  # toranut and shishi has minimum values
         
-        if len(self.united_min_list) <= self.shishi_count:
+        if len(self.united_min_list) <= self.shishi_count: # TODO
             self.shishi_result[0] = self.united_min_list
             self.shishi_count -= len(self.united_min_list)  # need to add more to fill the required
 
@@ -164,11 +170,10 @@ class Calculate:
             self.regular_result[0] = self.regular_min_list
             self.regular_count -= len(self.regular_min_list)
 
-
         for i in self.regular_min_list:
-            if regular_count == 1 and not self.add_last_toran(False):
+            if self.regular_count == 1 and not self.add_last_toran(False):
                 self.add_regular(i, False)
-            if not regular_count:
+            if not self.regular_count:
                 break
             current_havruta = self.excel.get_havruta(i)
             if current_havruta in self.regular_min_list:
@@ -177,9 +182,8 @@ class Calculate:
             else:
                 self.add_regular(i, False)
 
-
         self.put_results()
-
+        self.excel.update(self.toranim)
         Tkinter.close()
 
     def put_results(self):
@@ -192,6 +196,7 @@ class Calculate:
     def special_sevev(self):
         Tkinter.remove_frame()
         Tkinter.add_special_sevev()
+
 
 class Word:
     def __init__(self, shishi_count, regular_count):
@@ -206,70 +211,28 @@ class Word:
                 index = 1
                 continue
             self.table_cells[index].append([int(i) for i in i.split(', ')])
-        print(self.table_cells)
 
     def fill_table(self, shishi_result, regular_result):
-        counts = [0, 0, 0, 0] # shishi [lonely, havruta] regular [lonely, havruta]
-        # for i in range(self.shishi_count):
-        for i in self.table_cells: # 2 iterations - shishi and regular
-            for j in i: # over groups
+        results = [shishi_result, regular_result]
+        counts = [[0, 0], [0, 0]] # shishi [lonely, havruta] regular [lonely, havruta]
+        lengths = ((len(shishi_result[0]), len(shishi_result[1])),
+            (len(regular_result[0]), len(regular_result[1])))
+        for i in range(len(self.table_cells)): # 2 iterations - shishi and regular
+            for j in self.table_cells[i]: # over groups
+                flag = False
+                counter = 0
                 for k in j:
-                    if counts[1] + 1 < len(shishi_result[1]):
-                        self.table.rows[k // TABLE_SIZE].cells[k % TABLE_SIZE].text = shishi_result[1][counts[1]]
-                    counts[1] += 1
-        # for i in range(2): # shishi
-        #     for k in range(2):
-        #         if counts[1]+1 < len(shishi_result[1]): # can be shorter
-        #             self.table.rows[i*3 + k + 1].cells[4].text = shishi_result[1][counts[1]]
-        #             self.table.rows[i*3 + k + 1].cells[5].text = shishi_result[1][counts[1]+1]
-        #             counts[1] += 2
-        #         else:
-        #             self.table.rows[i*3 + k + 1].cells[4].text = shishi_result[0][counts[0]]
-        #             self.table.rows[i*3 + k + 1].cells[5].text = shishi_result[0][counts[0]+1]
-        #             counts[0] += 2
-        
-        # for i in range(3): # every week
-        #     for j in (0, 2): # rishon and shlishi
-        #         for k in range(2): # every line in week
-        #             if counts[3]+1 < len(regular_result[1]):
-        #                 self.table.rows[i*3 + k + 1].cells[j].text = regular_result[1][counts[3]]
-        #                 self.table.rows[i*3 + k + 1].cells[j+1].text = regular_result[1][counts[3]+1]
-        #                 counts[3] += 2
-        #             else:
-        #                 self.table.rows[i*3 + k + 1].cells[j].text = regular_result[0][counts[2]]
-        #                 self.table.rows[i*3 + k + 1].cells[j+1].text = regular_result[0][counts[2]+1]
-        #                 counts[2] += 2
-
-        # for i in range(2): # shabbes
-        #     for j in range(3):
-        #         if counts[3]+1 < len(regular_result[1]):
-        #             self.table.rows[i*3+1].cells[6+j].text = regular_result[1][counts[3]+j]
-        #             counts[3] += 1
-        #         else:
-        #             self.table.rows[i*3+1].cells[6+j].text = regular_result[1][counts[2]+j]
-        #             counts[2] += 1
-        #     for j in range(2):
-        #         if counts[3]+1 < len(regular_result[1]):
-        #             self.table.rows[i*3+2].cells[6+j].text = regular_result[1][counts[3]+j]
-        #             counts[3] += 1
-        #         else:
-        #             self.table.rows[i*3+2].cells[6+j].text = regular_result[1][counts[2]+j]
-        #             counts[2] += 1
-
-                # for j in range(len(regular_result[1]) - counts[3]):
-                #     self.table.rows[i*3 + k + 1].cells[6].text = regular_result[1][counts[3]+j]
-                #     if counts[3]+1 < len(regular_result[1]): # can be shorter
-                #         self.table.rows[i*3 + k + 1].cells[6].text = regular_result[1][counts[3]]
-                #         self.table.rows[i*3 + k + 1].cells[7].text = regular_result[1][counts[3]+1]
-                #         counts[3] += 2
-                #     else:
-                #         self.table.rows[i*3 + k + 1].cells[6].text = regular_result[0][counts[2]]
-                #         self.table.rows[i*3 + k + 1].cells[7].text = regular_result[0][counts[2]+1]
-                #         counts[2] += 2
+                    if counts[i][1] < lengths[i][1] and counter < len(j) - 1 or flag:
+                        self.table.rows[k // TABLE_SIZE].cells[k % TABLE_SIZE].text = results[i][1][counts[i][1]]
+                        flag = not flag
+                        counts[i][1] += 1
+                    else:
+                        self.table.rows[k // TABLE_SIZE].cells[k % TABLE_SIZE].text = results[i][0][counts[i][0]]
+                        counts[i][0] += 1
+                    counter += 1
         
         self.result.element.body.append(self.template_doc.element.body[0])
         self.result.save(FOLDER+'תוצאה.docx')
-
 
 
 
