@@ -224,8 +224,6 @@ class Calculate:
 
 class Word:
     def __init__(self):
-        if not exists(TEMPLATE_FILE) or not exists(XL_NAME):
-            raise Exception('חסרים לך קבצים יא גבר')
         self.doc = Document('template.docx')
         self.table = self.doc.tables[0]
 
@@ -282,7 +280,7 @@ class Word:
 
 
 if __name__ == '__main__':
-    try:
+    if not exists(TEMPLATE_FILE) or not exists(XL_NAME):
+        Tkinter.show(True, 'חסרים לך קבצים יא גבר')
+    else:
         Tkinter.start()
-    except Exception as e:
-        Tkinter.show(True, str(e))
