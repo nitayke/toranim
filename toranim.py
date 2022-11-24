@@ -214,7 +214,6 @@ class Calculate:
         Tkinter.close()
 
     def save_results(self):
-        print(self.results)
         word = Word()
         word.update_table_cells()
         word.fill_table(self.results)
@@ -281,6 +280,6 @@ class Word:
 
 if __name__ == '__main__':
     if not exists(TEMPLATE_FILE) or not exists(XL_NAME):
-        Tkinter.show(True, 'חסרים לך קבצים יא גבר')
+        Tkinter.show(True, 'חסרים לך קבצים (צריך שיהיה לך: template.docx, תורנים.xlsx)')
     else:
         Tkinter.start()
