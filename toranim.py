@@ -126,69 +126,77 @@ class Calculate:
         self.havrutot, self.toranim = self.excel.extract()
         self.results = [[[], []], [[], []]] # [regular: [lonely, havruta], shishi: [lonely, havruta]]
         self.count = [0, 0] # regular and shishi
+        self.min_lists = [[], []] # regular and shishi
 
-    def get_min_list(self, shishi):
+    def get_min_list(self, type):
         res = []
         min_shishi = min([i[SHISHI] for i in self.toranim.values()])
-        min_toranut = min([i[REGULAR] for i in self.toranim.values()])
+        min_regular = min([i[REGULAR] for i in self.toranim.values()])
         for i in self.toranim:
-            if shishi:
-                if self.toranim[i][REGULAR] == min_toranut and self.toranim[i][SHISHI] == min_shishi:
+            if type:
+                if self.toranim[i][REGULAR] == min_regular and self.toranim[i][SHISHI] == min_shishi:
                     res.append(i)
             else:
-                if self.toranim[i][REGULAR] == min_toranut:
+                if self.toranim[i][REGULAR] == min_regular:
+                    res.append(i)
+        if not res:
+            for i in self.toranim:
+                if self.toranim[i][SHISHI] == min_shishi:
                     res.append(i)
         return res
 
-    def add(self, name, has_havruta, shishi):
-        self.results[shishi][has_havruta].append(name)
-        self.count[shishi] -= 1
+    def add(self, name, has_havruta, type):
+        self.results[type][has_havruta].append(name)
+        self.count[type] -= 1
         self.toranim[name][REGULAR] += 1
-        if shishi:
+        if type:
             self.toranim[name][SHISHI] += 1
-    
-    def add_last_toran(self, shishi):
-        for i in self.get_min_list(shishi):
+        self.min_lists[type].remove(name)
+
+    def add_last_toran(self, type):
+        for i in self.get_min_list(type):
             if self.excel.get_havruta(i) == '':
-                self.add(i, False, shishi)
+                self.add(i, False, type)
                 return True
         return False
 
-    def util(self, shishi):
-        if len(self.min_lists[shishi]) <= self.count[shishi]:
-            self.results[shishi][MITUTA] = self.min_lists[shishi] # TODO: MAYBE NOT SUPPOSED TO BE LONELY
-            self.count[shishi] -= len(self.min_lists[shishi])  # need to add more to fill the required
-            for i in self.min_lists[shishi]:
-                self.toranim[i][shishi] += 1
-        for i in self.min_lists[shishi]:
-            if self.count[shishi] == 1 and not self.add_last_toran(shishi):
-                self.add(i, False, shishi)
-            if self.count[shishi] == 0:
-                break
-            current_havruta = self.excel.get_havruta(i)
-            if current_havruta in self.min_lists[shishi]:
-                self.add(current_havruta, True, shishi)
-                self.add(i, True, shishi)
-            else:
-                self.add(i, False, shishi)
+    def util1(self, type, name):
+        if name not in self.min_lists[type]:
+            return
+        if self.count[type] == 1 and not self.add_last_toran(type):
+            self.add(name, False, type)
+        if self.count[type] == 0:
+            return
+        current_havruta = self.excel.get_havruta(name)
+        if current_havruta in self.min_lists[type]:
+            self.add(current_havruta, True, type)
+            self.add(name, True, type)
+        else:
+            self.add(name, False, type)
 
-    def calculate(self): # TODO: FIX IT
+    def util(self, type):
+        self.min_lists[type] = self.get_min_list(type)
+        while len(self.min_lists[type]) <= self.count[type]:
+            for i in self.min_lists[type].copy():
+                self.util1(type, i)
+            self.min_lists[type] = self.get_min_list(type)
+        for i in self.min_lists[type].copy():
+            self.util1(type, i)
+
+    def calculate(self):
         self.count = Tkinter.get_sums()
-        self.min_lists = [[], self.get_min_list(SHISHI)] # regular and united
-        # united is where the regular and shishi have minimum values
         self.util(SHISHI)
-        self.min_lists[REGULAR] = self.get_min_list(REGULAR)
         self.util(REGULAR)
         self.save_results()
-        self.excel.update(self.toranim)
-        Tkinter.close()
+        # Tkinter.close()
 
     def save_results(self):
-        print('results\n', self.results)
+        print(self.results)
         word = Word()
         word.update_table_cells()
         word.fill_table(self.results)
         word.save()
+        self.excel.update(self.toranim)
 
 
 class Word:
@@ -217,15 +225,12 @@ class Word:
                     else:
                         self.table_cells[i][j] = (self.table_cells[i][j] * (counts[i][j] //
                          len(self.table_cells[i][j]) + 1))[:counts[i][j]]
-            
 
-    
     def fill_table(self, results):
         counts = [[0, 0], [0, 0]] # regular [lonely, havruta], shishi [lonely, havruta]
 
         lengths = ((len(results[REGULAR][MITUTA]), len(results[REGULAR][HAVRUTA])),
             ((len(results[SHISHI][MITUTA]), len(results[SHISHI][HAVRUTA]))))
-        
         for i in range(len(self.table_cells)): # 2 iterations - regular and shishi
             for j in self.table_cells[i]: # over groups.
                 flag = False
@@ -234,7 +239,9 @@ class Word:
                     cell = self.table.rows[k // TABLE_SIZE].cells[k % TABLE_SIZE]
                     if cell.text:
                         cell.text += ',\n'
-                    if counts[i][HAVRUTA] < lengths[i][HAVRUTA] and counter < len(j) - 1 or flag:
+                    # flag is True when one of havruta was inserted
+                    print(i, k, counts[i][HAVRUTA], lengths[i][HAVRUTA], counter, flag)
+                    if ( counts[i][HAVRUTA] < lengths[i][HAVRUTA] and counter < len(j) - 1 ) or flag:
                         cell.text += results[i][HAVRUTA][counts[i][HAVRUTA]]
                         flag = not flag
                         counts[i][HAVRUTA] += 1
