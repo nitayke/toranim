@@ -2,23 +2,24 @@ import openpyxl
 import tkinter as tk
 from tkinter import ttk
 from docx import Document
+from docx.shared import Pt
 from datetime import datetime
 
 FOLDER = 'C:/Users/user/Desktop/toranim/'
 VERSIONS_FOLDER = 'xl_versions'
 RESULTS_FOLDER = 'תוצאות'
 XL_NAME = 'try.xlsx'
-TABLE_SIZE = 9 # x9
+TABLE_SIZE = 9 # x 9
 # regular, shishi
-TABLE_CELLS = '''9, 10, 18, 19
+TABLE_CELLS = '''15, 16, 17, 24, 25
 11, 12, 20, 21
-15, 16, 17, 24, 25
-36, 37, 45, 46
-38, 39, 47, 48
+9, 10, 18, 19
 42, 43, 44, 51, 52
-63, 64, 72, 73
-65, 66, 74, 75
+38, 39, 47, 48
+36, 37, 45, 46
 67, 68, 76, 77
+65, 66, 74, 75
+63, 64, 72, 73
 
 13, 14, 22, 23
 40, 41, 49, 50'''.split('\n')
@@ -62,14 +63,15 @@ class Excel:
 
 class Tkinter:
     root = tk.Tk()
+    strvar_nums = []
+
     @classmethod
     def start(cls):
         cls.root.title('שיבוץ תורנים')
         frame = tk.Frame(cls.root, padx=60, pady=60)
         frame.pack()
-        c = Calculate()
-        ttk.Button(frame, text='סבב רגיל', command=lambda: c.regular_sevev()).pack()
-        # ttk.Button(frame, text='סבב מיוחד', command=lambda: c.special_sevev()).pack() # needs treatment!
+        ttk.Button(frame, text='סבב רגיל', command=lambda: Calculate().calculate()).pack()
+        ttk.Button(frame, text='סבב מיוחד', command=cls.special_sevev).pack()
         cls.root.mainloop()
 
     @classmethod
@@ -77,27 +79,41 @@ class Tkinter:
         cls.root.winfo_children()[0].destroy()
 
     @classmethod
-    def add_special_sevev(cls):
+    def get_int_counts(cls):
+        return [int(i.get()) for i in cls.strvar_nums if i]
+    
+    @classmethod
+    def special_sevev(cls):
+        cls.remove_frame()
         frame = tk.Frame(cls.root, padx=60, pady=60)
         frame.pack()
-        label = tk.Label(frame, text='תורנות רגילה:')
-        label.pack()
-        textvar = tk.StringVar(frame)
-        textvar.set('38')
-        spinbox = ttk.Spinbox(frame, from_=0, to=50,
-        textvariable=textvar)
-        spinbox.pack()
-        label = tk.Label(frame, text='תורנות שישי:')
-        label.pack()
-        textvar1 = tk.StringVar(frame)
-        textvar1.set('8')
-        spinbox = ttk.Spinbox(frame, from_=0, to=50,
-        textvariable=textvar1)
-        spinbox.pack()
-        c = Calculate()
-        ttk.Button(frame, text='סבבה',
-            command=lambda: c.calculate(
-            int(textvar.get()), int(textvar1.get()))).pack()
+
+        DAYS = ['ראשון-שני', 'שלישי-רביעי', 'חמישי-שישי', 'שבת']
+        cls.strvar_nums = [0] * 12
+        for i in range(4):
+            tk.Label(frame,text=DAYS[3-i]).grid(row=0, column=i)
+            for j in range(3):
+                if i == 0 and j == 2:
+                    break
+                frame1 = tk.Frame(frame)
+                frame1.grid(row=j+1, column=i)
+                cls.strvar_nums[j*4+i] = tk.StringVar()
+                cls.strvar_nums[j*4+i].set(str(4 + int(i==0)))
+                spinbox=tk.Spinbox(frame1, from_=0, to=10, textvariable=cls.strvar_nums[j*4+i])
+                spinbox.pack()
+    
+        ttk.Button(cls.root, text='סבבה', command=lambda:
+         Calculate().calculate()).pack()
+    
+    @classmethod
+    def get_sums(cls):
+        if cls.strvar_nums:
+            int_nums = cls.get_int_counts()
+            shishis_sum = int_nums[1] + int_nums[5]
+            rest_sum = sum(int_nums) - shishis_sum
+            return [rest_sum, shishis_sum]
+        else:
+            return [38, 8]
 
     @classmethod
     def close(cls):
@@ -156,37 +172,31 @@ class Calculate:
             else:
                 self.add(i, False, shishi)
 
-    def calculate(self, regular_count, shishi_count): # NOT WORKING PERFECTLY YET
-        self.count = [regular_count, shishi_count]
+    def calculate(self): # TODO: FIX IT
+        self.count = Tkinter.get_sums()
         self.min_lists = [[], self.get_min_list(SHISHI)] # regular and united
         # united is where the regular and shishi have minimum values
         self.util(SHISHI)
         self.min_lists[REGULAR] = self.get_min_list(REGULAR)
         self.util(REGULAR)
-        self.put_results()
+        self.save_results()
         self.excel.update(self.toranim)
         Tkinter.close()
 
-    def put_results(self):
+    def save_results(self):
         print('results\n', self.results)
-        word = Word(self.count)
+        word = Word()
+        word.update_table_cells()
         word.fill_table(self.results)
-        word.update()
-
-    def regular_sevev(self):
-        self.calculate(38, 8)
-
-    def special_sevev(self):
-        Tkinter.remove_frame()
-        Tkinter.add_special_sevev()
+        word.save()
 
 
 class Word:
-    def __init__(self, count):
-        self.template_doc = Document(FOLDER + 'template.docx')
-        self.table = self.template_doc.tables[0]
-        self.result = Document(FOLDER + 'empty.docx')
-        self.regular_count, self.shishi_count = count
+    def __init__(self):
+        self.doc = Document(FOLDER + 'template.docx')
+        self.table = self.doc.tables[0]
+
+    def update_table_cells(self):
         self.table_cells = [[], []] # regular, shishi
         index = 0
         for i in TABLE_CELLS:
@@ -194,7 +204,22 @@ class Word:
                 index = 1
                 continue
             self.table_cells[index].append([int(i) for i in i.split(', ')])
+        if Tkinter.strvar_nums: # special sevev
+            int_counts = Tkinter.get_int_counts()
+            shishi_counts = [int_counts[1], int_counts[5]]
+            tmp = shishi_counts.copy()
+            rest_counts = [i for i in int_counts if not i in tmp or tmp.remove(i)]
+            counts = [rest_counts, shishi_counts]
+            for i in range(len(self.table_cells)): # regular and shishi
+                for j in range(len(self.table_cells[i])): # groups
+                    if counts[i][j] < len(self.table_cells[i][j]):
+                        self.table_cells[i][j] = self.table_cells[i][j][:counts[i][j]]
+                    else:
+                        self.table_cells[i][j] = (self.table_cells[i][j] * (counts[i][j] //
+                         len(self.table_cells[i][j]) + 1))[:counts[i][j]]
+            
 
+    
     def fill_table(self, results):
         counts = [[0, 0], [0, 0]] # regular [lonely, havruta], shishi [lonely, havruta]
 
@@ -202,23 +227,25 @@ class Word:
             ((len(results[SHISHI][MITUTA]), len(results[SHISHI][HAVRUTA]))))
         
         for i in range(len(self.table_cells)): # 2 iterations - regular and shishi
-            for j in self.table_cells[i]: # over groups. I want to put shishi first
+            for j in self.table_cells[i]: # over groups.
                 flag = False
                 counter = 0
                 for k in j:
-                    # print(i, k, results[i][MITUTA], counts[i])
+                    cell = self.table.rows[k // TABLE_SIZE].cells[k % TABLE_SIZE]
+                    if cell.text:
+                        cell.text += ',\n'
                     if counts[i][HAVRUTA] < lengths[i][HAVRUTA] and counter < len(j) - 1 or flag:
-                        self.table.rows[k // TABLE_SIZE].cells[k % TABLE_SIZE].text = results[i][HAVRUTA][counts[i][HAVRUTA]]
+                        cell.text += results[i][HAVRUTA][counts[i][HAVRUTA]]
                         flag = not flag
                         counts[i][HAVRUTA] += 1
                     else:
-                        self.table.rows[k // TABLE_SIZE].cells[k % TABLE_SIZE].text = results[i][MITUTA][counts[i][MITUTA]]
+                        cell.text += results[i][MITUTA][counts[i][MITUTA]]
                         counts[i][MITUTA] += 1
+                    cell.paragraphs[0].runs[0].font.size = Pt(12)
                     counter += 1
 
-    def update(self):
-        self.result.element.body.append(self.template_doc.element.body[0])
-        self.result.save(FOLDER+RESULTS_FOLDER+'/'+datetime.now().strftime('%d-%m-%Y_%H-%M-%S')+'.docx')
+    def save(self):
+        self.doc.save(f'{FOLDER}{RESULTS_FOLDER}/{datetime.now().strftime("%d-%m-%Y_%H-%M-%S")}.docx')
 
 
 
