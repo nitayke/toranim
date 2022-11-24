@@ -8,7 +8,7 @@ from datetime import datetime
 FOLDER = 'C:/Users/user/Desktop/toranim/'
 VERSIONS_FOLDER = 'xl_versions'
 RESULTS_FOLDER = 'תוצאות'
-XL_NAME = 'try.xlsx'
+XL_NAME = 'תורנים.xlsx'
 TABLE_SIZE = 9 # x 9
 # regular, shishi
 TABLE_CELLS = '''15, 16, 17, 24, 25
@@ -144,7 +144,6 @@ class Calculate:
             for i in self.toranim:
                 if self.toranim[i][SHISHI] == min_shishi:
                     res.append(i)
-        print('אופיר קופל' in res, 'אלישע פרקש' in res, type)
         return res
 
     def add(self, name, has_havruta, type):
@@ -162,32 +161,34 @@ class Calculate:
                 return True
         return False
 
-    def util1(self, type, name):
-        if name not in self.min_lists[type]:
+    def util1(self, type):
+        name = self.min_lists[type][0]
+        if self.count[type] == 1:
+            self.add_last_toran(type)
             return
-        if self.count[type] == 1 and not self.add_last_toran(type):
-            self.add(name, False, type)
-        if self.count[type] == 0:
-            return
-        current_havruta = self.excel.get_havruta(name)
-        if current_havruta in self.min_lists[type]:
-            self.add(current_havruta, True, type)
+        havruta = self.excel.get_havruta(name)
+        if havruta in self.min_lists[type]:
+            self.add(havruta, True, type)
             self.add(name, True, type)
         else:
             self.add(name, False, type)
 
     def util(self, type):
         self.min_lists[type] = self.get_min_list(type)
-        print(len(self.min_lists[type]), self.count[type])
-        while True:
-            for i in self.min_lists[type].copy(): # TODO: run to count
-                self.util1(type, i)
-                # TODO: 2 is default, but need unique
-                if self.count[type] <= 2 and len(self.results[type][MITUTA]) < 2 and not self.add_last_toran(type): 
-                    self.add(i, False, type)
+        if len(self.min_lists[type]) < self.count[type]:
+            for i in self.min_lists[type]:
+                self.util1(type)
+            self.min_lists[type] = self.get_min_list(type)
+        while self.count[type]:
+            self.util1(type)
+            if self.count[type] <= 2 and len(self.results[type][MITUTA]) < 2 and not self.add_last_toran(type): 
+                self.add(i, False, type)
+            # for i in self.min_lists[type].copy(): # TODO: run to count
+            #     self.util1(type, i)
+            #     # TODO: 2 is default, but need unique
+            #     if self.count[type] <= 2 and len(self.results[type][MITUTA]) < 2 and not self.add_last_toran(type): 
+            #         self.add(i, False, type)
             # if len(self.min_lists[type]) > self.count[type]:
-            if not self.count[type]:
-                break
             self.min_lists[type] = self.get_min_list(type)
             
 
@@ -204,7 +205,7 @@ class Calculate:
         word.update_table_cells()
         word.fill_table(self.results)
         word.save()
-        # self.excel.update(self.toranim)
+        self.excel.update(self.toranim)
 
 
 class Word:
