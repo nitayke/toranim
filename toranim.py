@@ -13,7 +13,6 @@ TABLE_SIZE = 9 # x 9
 # regular, shishi
 TABLE_CELLS = '''15, 16, 17, 24, 25
 11, 12, 20, 21
-9, 10, 18, 19
 42, 43, 44, 51, 52
 38, 39, 47, 48
 36, 37, 45, 46
@@ -54,7 +53,7 @@ class Excel:
         return ''
     
     def update(self, toranim_data):
-        # self.wb.save(f'{FOLDER}{VERSIONS_FOLDER}/{datetime.now().strftime("%d-%m-%Y_%H-%M-%S")}.xlsx')
+        self.wb.save(f'{FOLDER}{VERSIONS_FOLDER}/{datetime.now().strftime("%d-%m-%Y_%H-%M-%S")}.xlsx')
         for i, name in enumerate(toranim_data):
             self.ws.cell(i+2, 3).value = toranim_data[name][REGULAR]
             self.ws.cell(i+2, 4).value = toranim_data[name][SHISHI]
@@ -99,6 +98,8 @@ class Tkinter:
                 frame1.grid(row=j+1, column=i)
                 cls.strvar_nums[j*4+i] = tk.StringVar()
                 cls.strvar_nums[j*4+i].set(str(4 + int(i==0)))
+                if i == 3 and j == 0:
+                    cls.strvar_nums[j*4+i].set('0')
                 spinbox=tk.Spinbox(frame1, from_=0, to=10, textvariable=cls.strvar_nums[j*4+i])
                 spinbox.pack()
     
@@ -113,7 +114,7 @@ class Tkinter:
             rest_sum = sum(int_nums) - shishis_sum
             return [rest_sum, shishis_sum]
         else:
-            return [38, 8]
+            return [34, 8]
 
     @classmethod
     def close(cls):
@@ -143,6 +144,7 @@ class Calculate:
             for i in self.toranim:
                 if self.toranim[i][SHISHI] == min_shishi:
                     res.append(i)
+        print('אופיר קופל' in res, 'אלישע פרקש' in res, type)
         return res
 
     def add(self, name, has_havruta, type):
@@ -176,12 +178,18 @@ class Calculate:
 
     def util(self, type):
         self.min_lists[type] = self.get_min_list(type)
-        while len(self.min_lists[type]) <= self.count[type]:
-            for i in self.min_lists[type].copy():
+        print(len(self.min_lists[type]), self.count[type])
+        while True:
+            for i in self.min_lists[type].copy(): # TODO: run to count
                 self.util1(type, i)
+                # TODO: 2 is default, but need unique
+                if self.count[type] <= 2 and len(self.results[type][MITUTA]) < 2 and not self.add_last_toran(type): 
+                    self.add(i, False, type)
+            # if len(self.min_lists[type]) > self.count[type]:
+            if not self.count[type]:
+                break
             self.min_lists[type] = self.get_min_list(type)
-        for i in self.min_lists[type].copy():
-            self.util1(type, i)
+            
 
     def calculate(self):
         self.count = Tkinter.get_sums()
@@ -196,7 +204,7 @@ class Calculate:
         word.update_table_cells()
         word.fill_table(self.results)
         word.save()
-        self.excel.update(self.toranim)
+        # self.excel.update(self.toranim)
 
 
 class Word:
@@ -206,10 +214,10 @@ class Word:
 
     def update_table_cells(self):
         self.table_cells = [[], []] # regular, shishi
-        index = 0
+        index = REGULAR
         for i in TABLE_CELLS:
             if i == '':
-                index = 1
+                index = SHISHI
                 continue
             self.table_cells[index].append([int(i) for i in i.split(', ')])
         if Tkinter.strvar_nums: # special sevev
@@ -240,7 +248,6 @@ class Word:
                     if cell.text:
                         cell.text += ',\n'
                     # flag is True when one of havruta was inserted
-                    print(i, k, counts[i][HAVRUTA], lengths[i][HAVRUTA], counter, flag)
                     if ( counts[i][HAVRUTA] < lengths[i][HAVRUTA] and counter < len(j) - 1 ) or flag:
                         cell.text += results[i][HAVRUTA][counts[i][HAVRUTA]]
                         flag = not flag
