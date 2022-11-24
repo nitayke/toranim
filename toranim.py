@@ -1,14 +1,17 @@
 import openpyxl
 import tkinter as tk
 from tkinter import ttk
+import tkinter.messagebox as mb
 from docx import Document
 from docx.shared import Pt
 from datetime import datetime
+from os import mkdir
+from os.path import exists
 
-FOLDER = 'C:/Users/user/Desktop/toranim/'
 VERSIONS_FOLDER = 'xl_versions'
 RESULTS_FOLDER = 'תוצאות'
-XL_NAME = 'try.xlsx'
+TEMPLATE_FILE = 'template.docx'
+XL_NAME = 'תורנים.xlsx'
 TABLE_SIZE = 9 # x 9
 # regular, shishi
 TABLE_CELLS = '''15, 16, 17, 24, 25
@@ -29,7 +32,7 @@ SHISHI = HAVRUTA = 1
 
 class Excel:
     def __init__(self):
-        self.wb = openpyxl.load_workbook(FOLDER + XL_NAME)
+        self.wb = openpyxl.load_workbook(XL_NAME)
         self.ws = self.wb.active
         self.toranim_data = {} # {name: [all, shishi]}
         self.havruta_data = []
@@ -53,11 +56,13 @@ class Excel:
         return ''
     
     def update(self, toranim_data):
-        self.wb.save(f'{FOLDER}{VERSIONS_FOLDER}/{datetime.now().strftime("%d-%m-%Y_%H-%M-%S")}.xlsx')
+        if not exists(VERSIONS_FOLDER):
+            mkdir(VERSIONS_FOLDER)
+        self.wb.save(f'{VERSIONS_FOLDER}/{datetime.now().strftime("%d-%m-%Y_%H-%M-%S")}.xlsx')
         for i, name in enumerate(toranim_data):
             self.ws.cell(i+2, 3).value = toranim_data[name][REGULAR]
             self.ws.cell(i+2, 4).value = toranim_data[name][SHISHI]
-        self.wb.save(FOLDER + XL_NAME)
+        self.wb.save(XL_NAME)
 
 
 class Tkinter:
@@ -97,8 +102,7 @@ class Tkinter:
                 frame1 = tk.Frame(frame)
                 frame1.grid(row=j+1, column=i)
                 cls.strvar_nums[j*4+i] = tk.StringVar()
-                # cls.strvar_nums[j*4+i].set(str(4 + int(i==0)))
-                cls.strvar_nums[j*4+i].set(str(j*4+i))
+                cls.strvar_nums[j*4+i].set(str(4 + int(i==0)))
                 spinbox=tk.Spinbox(frame1, from_=0, to=11, textvariable=cls.strvar_nums[j*4+i])
                 spinbox.pack()
     
@@ -118,6 +122,13 @@ class Tkinter:
     @classmethod
     def close(cls):
         cls.root.destroy()
+
+    @classmethod
+    def show(cls, type, msg):
+        if type:
+            mb.showerror('קרתה תקלה', msg)
+        else:
+            mb.showinfo('כל הכבוד', msg)
 
 
 class Calculate:
@@ -172,6 +183,12 @@ class Calculate:
         else:
             self.add(name, False, type)
 
+    def get_odd_count(self):
+        if Tkinter.strvar_nums:
+            nums = Tkinter.get_int_counts()
+            return sum([i % 2 for i in nums])
+        return 2
+
     def util(self, type):
         self.min_lists[type] = self.get_min_list(type)
         if len(self.min_lists[type]) < self.count[type]:
@@ -180,14 +197,10 @@ class Calculate:
             self.min_lists[type] = self.get_min_list(type)
         while self.count[type]:
             self.util1(type)
-            if self.count[type] <= 2 and len(self.results[type][MITUTA]) < 2 and not self.add_last_toran(type): 
+            # how many days need a single toran
+            odds_count = self.get_odd_count()
+            if self.count[type] <= odds_count and len(self.results[type][MITUTA]) < odds_count and not self.add_last_toran(type): 
                 self.add(i, False, type)
-            # for i in self.min_lists[type].copy(): # TODO: run to count
-            #     self.util1(type, i)
-            #     # TODO: 2 is default, but need unique
-            #     if self.count[type] <= 2 and len(self.results[type][MITUTA]) < 2 and not self.add_last_toran(type): 
-            #         self.add(i, False, type)
-            # if len(self.min_lists[type]) > self.count[type]:
             self.min_lists[type] = self.get_min_list(type)
             
 
@@ -196,7 +209,9 @@ class Calculate:
         self.util(SHISHI)
         self.util(REGULAR)
         self.save_results()
-        # Tkinter.close()
+        Tkinter.show(False,
+        'התוצאה שמורה ב"תוצאות" והקובץ "תורנים" התעדכן. תסתכל על "xl_versions" אם אתה רוצה להתחרט ולשחזר את הקובץ הקודם.')
+        Tkinter.close()
 
     def save_results(self):
         print(self.results)
@@ -204,12 +219,14 @@ class Calculate:
         word.update_table_cells()
         word.fill_table(self.results)
         word.save()
-        # self.excel.update(self.toranim)
+        self.excel.update(self.toranim)
 
 
 class Word:
     def __init__(self):
-        self.doc = Document(FOLDER + 'template.docx')
+        if not exists(TEMPLATE_FILE) or not exists(XL_NAME):
+            raise Exception('חסרים לך קבצים יא גבר')
+        self.doc = Document('template.docx')
         self.table = self.doc.tables[0]
 
     def update_table_cells(self):
@@ -259,9 +276,13 @@ class Word:
                     counter += 1
 
     def save(self):
-        self.doc.save(f'{FOLDER}{RESULTS_FOLDER}/{datetime.now().strftime("%d-%m-%Y_%H-%M-%S")}.docx')
-
+        if not exists(RESULTS_FOLDER):
+            mkdir(RESULTS_FOLDER)
+        self.doc.save(f'{RESULTS_FOLDER}/{datetime.now().strftime("%d-%m-%Y_%H-%M-%S")}.docx')
 
 
 if __name__ == '__main__':
-    Tkinter.start()
+    try:
+        Tkinter.start()
+    except Exception as e:
+        Tkinter.show(True, str(e))
