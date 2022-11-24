@@ -5,8 +5,9 @@ from docx import Document
 from datetime import datetime
 
 FOLDER = 'C:/Users/user/Desktop/toranim/'
-VERSIONS_FOLDER = 'versions'
-XL_NAME = 'תורנים.xlsx'
+VERSIONS_FOLDER = 'xl_versions'
+RESULTS_FOLDER = 'תוצאות'
+XL_NAME = 'try.xlsx'
 TABLE_SIZE = 9 # x9
 # regular, shishi
 TABLE_CELLS = '''9, 10, 18, 19
@@ -52,7 +53,7 @@ class Excel:
         return ''
     
     def update(self, toranim_data):
-        self.wb.save(f'{FOLDER}{VERSIONS_FOLDER}/{datetime.now().strftime("%m-%d-%Y_%H-%M-%S")}.xlsx')
+        # self.wb.save(f'{FOLDER}{VERSIONS_FOLDER}/{datetime.now().strftime("%d-%m-%Y_%H-%M-%S")}.xlsx')
         for i, name in enumerate(toranim_data):
             self.ws.cell(i+2, 3).value = toranim_data[name][REGULAR]
             self.ws.cell(i+2, 4).value = toranim_data[name][SHISHI]
@@ -68,7 +69,7 @@ class Tkinter:
         frame.pack()
         c = Calculate()
         ttk.Button(frame, text='סבב רגיל', command=lambda: c.regular_sevev()).pack()
-        # ttk.Button(frame, text='סבב מיוחד', command=lambda: c.special_sevev()).pack()
+        # ttk.Button(frame, text='סבב מיוחד', command=lambda: c.special_sevev()).pack() # needs treatment!
         cls.root.mainloop()
 
     @classmethod
@@ -110,21 +111,17 @@ class Calculate:
         self.results = [[[], []], [[], []]] # [regular: [lonely, havruta], shishi: [lonely, havruta]]
         self.count = [0, 0] # regular and shishi
 
-    def get_united_min_list(self):
+    def get_min_list(self, shishi):
         res = []
         min_shishi = min([i[SHISHI] for i in self.toranim.values()])
         min_toranut = min([i[REGULAR] for i in self.toranim.values()])
         for i in self.toranim:
-            if self.toranim[i][REGULAR] == min_toranut and self.toranim[i][SHISHI] == min_shishi:
-                res.append(i)
-        return res
-
-    def get_regular_min_list(self):
-        res = []
-        min_toranut = min([i[REGULAR] for i in self.toranim.values()]) # TODO: improve double
-        for i in self.toranim:
-            if self.toranim[i][REGULAR] == min_toranut:
-                res.append(i)
+            if shishi:
+                if self.toranim[i][REGULAR] == min_toranut and self.toranim[i][SHISHI] == min_shishi:
+                    res.append(i)
+            else:
+                if self.toranim[i][REGULAR] == min_toranut:
+                    res.append(i)
         return res
 
     def add(self, name, has_havruta, shishi):
@@ -135,11 +132,7 @@ class Calculate:
             self.toranim[name][SHISHI] += 1
     
     def add_last_toran(self, shishi):
-        if shishi:
-            list = self.get_united_min_list()
-        else:
-            list = self.get_regular_min_list()
-        for i in list.copy(): # TODO: remove copy
+        for i in self.get_min_list(shishi):
             if self.excel.get_havruta(i) == '':
                 self.add(i, False, shishi)
                 return True
@@ -151,7 +144,6 @@ class Calculate:
             self.count[shishi] -= len(self.min_lists[shishi])  # need to add more to fill the required
             for i in self.min_lists[shishi]:
                 self.toranim[i][shishi] += 1
-
         for i in self.min_lists[shishi]:
             if self.count[shishi] == 1 and not self.add_last_toran(shishi):
                 self.add(i, False, shishi)
@@ -164,18 +156,19 @@ class Calculate:
             else:
                 self.add(i, False, shishi)
 
-    def calculate(self, regular_count, shishi_count):
-        self.count = [shishi_count, regular_count]
-        self.min_lists = [[], self.get_united_min_list()] # regular and united
+    def calculate(self, regular_count, shishi_count): # NOT WORKING PERFECTLY YET
+        self.count = [regular_count, shishi_count]
+        self.min_lists = [[], self.get_min_list(SHISHI)] # regular and united
         # united is where the regular and shishi have minimum values
         self.util(SHISHI)
-        self.min_lists[0] = self.get_regular_min_list()
+        self.min_lists[REGULAR] = self.get_min_list(REGULAR)
         self.util(REGULAR)
         self.put_results()
         self.excel.update(self.toranim)
         Tkinter.close()
 
     def put_results(self):
+        print('results\n', self.results)
         word = Word(self.count)
         word.fill_table(self.results)
         word.update()
@@ -192,7 +185,7 @@ class Word:
     def __init__(self, count):
         self.template_doc = Document(FOLDER + 'template.docx')
         self.table = self.template_doc.tables[0]
-        self.result = Document(FOLDER + 'תוצאה.docx')
+        self.result = Document(FOLDER + 'empty.docx')
         self.regular_count, self.shishi_count = count
         self.table_cells = [[], []] # regular, shishi
         index = 0
@@ -209,10 +202,11 @@ class Word:
             ((len(results[SHISHI][MITUTA]), len(results[SHISHI][HAVRUTA]))))
         
         for i in range(len(self.table_cells)): # 2 iterations - regular and shishi
-            for j in self.table_cells[1-i]: # over groups. I want to put shishi first
+            for j in self.table_cells[i]: # over groups. I want to put shishi first
                 flag = False
                 counter = 0
                 for k in j:
+                    # print(i, k, results[i][MITUTA], counts[i])
                     if counts[i][HAVRUTA] < lengths[i][HAVRUTA] and counter < len(j) - 1 or flag:
                         self.table.rows[k // TABLE_SIZE].cells[k % TABLE_SIZE].text = results[i][HAVRUTA][counts[i][HAVRUTA]]
                         flag = not flag
@@ -223,9 +217,8 @@ class Word:
                     counter += 1
 
     def update(self):
-        self.result.add_paragraph(datetime.now().strftime('%m/%d/%Y, %H:%M:%S'))
         self.result.element.body.append(self.template_doc.element.body[0])
-        self.result.save(FOLDER+'תוצאה.docx')
+        self.result.save(FOLDER+RESULTS_FOLDER+'/'+datetime.now().strftime('%d-%m-%Y_%H-%M-%S')+'.docx')
 
 
 
