@@ -8,7 +8,7 @@ from datetime import datetime
 FOLDER = 'C:/Users/user/Desktop/toranim/'
 VERSIONS_FOLDER = 'xl_versions'
 RESULTS_FOLDER = 'תוצאות'
-XL_NAME = 'תורנים.xlsx'
+XL_NAME = 'try.xlsx'
 TABLE_SIZE = 9 # x 9
 # regular, shishi
 TABLE_CELLS = '''15, 16, 17, 24, 25
@@ -92,15 +92,14 @@ class Tkinter:
         for i in range(4):
             tk.Label(frame,text=DAYS[3-i]).grid(row=0, column=i)
             for j in range(3):
-                if i == 0 and j == 2:
-                    break
+                if i == 0 and j == 2 or i == 3 and j == 0:
+                    continue
                 frame1 = tk.Frame(frame)
                 frame1.grid(row=j+1, column=i)
                 cls.strvar_nums[j*4+i] = tk.StringVar()
-                cls.strvar_nums[j*4+i].set(str(4 + int(i==0)))
-                if i == 3 and j == 0:
-                    cls.strvar_nums[j*4+i].set('0')
-                spinbox=tk.Spinbox(frame1, from_=0, to=10, textvariable=cls.strvar_nums[j*4+i])
+                # cls.strvar_nums[j*4+i].set(str(4 + int(i==0)))
+                cls.strvar_nums[j*4+i].set(str(j*4+i))
+                spinbox=tk.Spinbox(frame1, from_=0, to=11, textvariable=cls.strvar_nums[j*4+i])
                 spinbox.pack()
     
         ttk.Button(cls.root, text='סבבה', command=lambda:
@@ -110,7 +109,7 @@ class Tkinter:
     def get_sums(cls):
         if cls.strvar_nums:
             int_nums = cls.get_int_counts()
-            shishis_sum = int_nums[1] + int_nums[5]
+            shishis_sum = int_nums[1] + int_nums[4]
             rest_sum = sum(int_nums) - shishis_sum
             return [rest_sum, shishis_sum]
         else:
@@ -205,7 +204,7 @@ class Calculate:
         word.update_table_cells()
         word.fill_table(self.results)
         word.save()
-        self.excel.update(self.toranim)
+        # self.excel.update(self.toranim)
 
 
 class Word:
@@ -223,7 +222,7 @@ class Word:
             self.table_cells[index].append([int(i) for i in i.split(', ')])
         if Tkinter.strvar_nums: # special sevev
             int_counts = Tkinter.get_int_counts()
-            shishi_counts = [int_counts[1], int_counts[5]]
+            shishi_counts = [int_counts[1], int_counts[4]]
             tmp = shishi_counts.copy()
             rest_counts = [i for i in int_counts if not i in tmp or tmp.remove(i)]
             counts = [rest_counts, shishi_counts]
