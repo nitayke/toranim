@@ -186,8 +186,9 @@ class Calculate:
     def get_odd_count(self):
         if Tkinter.strvar_nums:
             nums = Tkinter.get_int_counts()
-            return sum([i % 2 for i in nums])
-        return 2
+            self.odds_count = sum([i % 2 for i in nums])
+        else:
+            self.odds_count = 2
 
     def util(self, type):
         self.min_lists[type] = self.get_min_list(type)
@@ -195,17 +196,16 @@ class Calculate:
             for i in self.min_lists[type]:
                 self.util1(type)
             self.min_lists[type] = self.get_min_list(type)
-        while self.count[type]:
+        while self.count[type] > 0:
             self.util1(type)
-            # how many days need a single toran
-            odds_count = self.get_odd_count()
-            if self.count[type] <= odds_count and len(self.results[type][MITUTA]) < odds_count and not self.add_last_toran(type): 
+            # odds_count = days that need a single toran
+            if self.count[type] and len(self.results[type][MITUTA]) < self.odds_count and not self.add_last_toran(type):
                 self.add(i, False, type)
             self.min_lists[type] = self.get_min_list(type)
-            
 
     def calculate(self):
         self.count = Tkinter.get_sums()
+        self.get_odd_count()
         self.util(SHISHI)
         self.util(REGULAR)
         self.save_results()
@@ -250,7 +250,6 @@ class Word:
 
     def fill_table(self, results):
         counts = [[0, 0], [0, 0]] # regular [lonely, havruta], shishi [lonely, havruta]
-
         lengths = ((len(results[REGULAR][MITUTA]), len(results[REGULAR][HAVRUTA])),
             ((len(results[SHISHI][MITUTA]), len(results[SHISHI][HAVRUTA]))))
         for i in range(len(self.table_cells)): # 2 iterations - regular and shishi
