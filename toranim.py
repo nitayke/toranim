@@ -5,26 +5,27 @@ import tkinter.messagebox as mb
 from docx import Document
 from docx.shared import Pt
 from datetime import datetime
-from os import mkdir
-from os.path import exists
+import os
+from glob import glob
 
 VERSIONS_FOLDER = 'xl_versions'
 RESULTS_FOLDER = 'תוצאות'
 TEMPLATE_FILE = 'template.docx'
 XL_NAME = 'תורנים.xlsx'
 TABLE_SIZE = 9 # x 9
+SHISHI_INDEX = (1, 4)
 # regular, shishi
-TABLE_CELLS = '''15, 16, 17, 24, 25
-11, 12, 20, 21
-42, 43, 44, 51, 52
-38, 39, 47, 48
-36, 37, 45, 46
-67, 68, 76, 77
-65, 66, 74, 75
-63, 64, 72, 73
+TABLE_CELLS = '''15 16 17 24 25
+11 12 20 21
+42 43 44 51 52
+38 39 47 48
+36 37 45 46
+67 68 76 77
+65 66 74 75
+63 64 72 73
 
-13, 14, 22, 23
-40, 41, 49, 50'''.split('\n')
+13 14 22 23
+40 41 49 50'''.split('\n')
 
 REGULAR = MITUTA = 0
 SHISHI = HAVRUTA = 1
@@ -56,8 +57,8 @@ class Excel:
         return ''
     
     def update(self, toranim_data):
-        if not exists(VERSIONS_FOLDER):
-            mkdir(VERSIONS_FOLDER)
+        if not os.path.exists(VERSIONS_FOLDER):
+            os.mkdir(VERSIONS_FOLDER)
         self.wb.save(f'{VERSIONS_FOLDER}/{datetime.now().strftime("%d-%m-%Y_%H-%M-%S")}.xlsx')
         for i, name in enumerate(toranim_data):
             self.ws.cell(i+2, 3).value = toranim_data[name][REGULAR]
@@ -66,16 +67,17 @@ class Excel:
 
 
 class Tkinter:
-    root = tk.Tk()
     strvar_nums = []
 
     @classmethod
     def start(cls):
+        cls.root = tk.Tk()
         cls.root.title('שיבוץ תורנים')
         frame = tk.Frame(cls.root, padx=60, pady=60)
         frame.pack()
         ttk.Button(frame, text='סבב רגיל', command=lambda: Calculate().calculate()).pack()
         ttk.Button(frame, text='סבב מיוחד', command=cls.special_sevev).pack()
+        ttk.Button(frame, text='שחזר פעם אחרונה', command=cls.restore).pack()
         cls.root.mainloop()
 
     @classmethod
@@ -103,7 +105,7 @@ class Tkinter:
                 frame1.grid(row=j+1, column=i)
                 cls.strvar_nums[j*4+i] = tk.StringVar()
                 cls.strvar_nums[j*4+i].set(str(4 + int(i==0)))
-                spinbox=tk.Spinbox(frame1, from_=0, to=11, textvariable=cls.strvar_nums[j*4+i])
+                spinbox=tk.Spinbox(frame1, from_=0, to=50, textvariable=cls.strvar_nums[j*4+i])
                 spinbox.pack()
     
         ttk.Button(cls.root, text='סבבה', command=lambda:
@@ -113,7 +115,7 @@ class Tkinter:
     def get_sums(cls):
         if cls.strvar_nums:
             int_nums = cls.get_int_counts()
-            shishis_sum = int_nums[1] + int_nums[4]
+            shishis_sum = sum([int_nums[i] for i in SHISHI_INDEX])
             rest_sum = sum(int_nums) - shishis_sum
             return [rest_sum, shishis_sum]
         else:
@@ -130,6 +132,16 @@ class Tkinter:
         else:
             mb.showinfo('כל הכבוד', msg)
 
+    @classmethod
+    def restore(cls):
+        xl_folder, word_foler = glob(VERSIONS_FOLDER + '/*'), glob(RESULTS_FOLDER + '/*')
+        if not xl_folder or not word_foler:
+            cls.show(True, "אין לך מה לשחזר")
+        else:
+            os.remove(XL_NAME)
+            os.remove(max(word_foler, key=os.path.getctime)) # latest file in folder
+            os.rename(max(xl_folder, key=os.path.getctime), XL_NAME)
+            cls.show(False, 'שוחזר בהצלחה')
 
 class Calculate:
     def __init__(self):
@@ -199,8 +211,8 @@ class Calculate:
         while self.count[type] > 0:
             self.util1(type)
             # odds_count = days that need a single toran
-            if self.count[type] and len(self.results[type][MITUTA]) < self.odds_count and not self.add_last_toran(type):
-                self.add(i, False, type)
+            if self.count[type] and len(self.results[type][MITUTA]) < self.odds_count:
+                self.add_last_toran(type)
             self.min_lists[type] = self.get_min_list(type)
 
     def calculate(self):
@@ -210,7 +222,7 @@ class Calculate:
         self.util(REGULAR)
         self.save_results()
         Tkinter.show(False,
-        'התוצאה שמורה ב"תוצאות" והקובץ "תורנים" התעדכן. תסתכל על "xl_versions" אם אתה רוצה להתחרט ולשחזר את הקובץ הקודם.')
+        'התוצאה שמורה ב"תוצאות" והקובץ "תורנים" התעדכן. אם אתה רוצה להתחרט אז תיכנס שוב לתוכנה ותלחץ על "שחזר".')
         Tkinter.close()
 
     def save_results(self):
@@ -233,12 +245,14 @@ class Word:
             if i == '':
                 index = SHISHI
                 continue
-            self.table_cells[index].append([int(i) for i in i.split(', ')])
+            self.table_cells[index].append([int(i) for i in i.split(' ')])
         if Tkinter.strvar_nums: # special sevev
             int_counts = Tkinter.get_int_counts()
-            shishi_counts = [int_counts[1], int_counts[4]]
-            tmp = shishi_counts.copy()
-            rest_counts = [i for i in int_counts if not i in tmp or tmp.remove(i)]
+            shishi_counts = [int_counts[i] for i in SHISHI_INDEX]
+            rest_counts = []
+            for key, value in enumerate(int_counts):
+                if key not in SHISHI_INDEX:
+                    rest_counts.append(value)
             counts = [rest_counts, shishi_counts]
             for i in range(len(self.table_cells)): # regular and shishi
                 for j in range(len(self.table_cells[i])): # groups
@@ -250,18 +264,15 @@ class Word:
 
     def fill_table(self, results):
         counts = [[0, 0], [0, 0]] # regular [lonely, havruta], shishi [lonely, havruta]
-        lengths = ((len(results[REGULAR][MITUTA]), len(results[REGULAR][HAVRUTA])),
-            ((len(results[SHISHI][MITUTA]), len(results[SHISHI][HAVRUTA]))))
         for i in range(len(self.table_cells)): # 2 iterations - regular and shishi
             for j in self.table_cells[i]: # over groups.
                 flag = False
-                counter = 0
-                for k in j:
+                for iteration, k in enumerate(j):
                     cell = self.table.rows[k // TABLE_SIZE].cells[k % TABLE_SIZE]
                     if cell.text:
                         cell.text += ',\n'
                     # flag is True when one of havruta was inserted
-                    if ( counts[i][HAVRUTA] < lengths[i][HAVRUTA] and counter < len(j) - 1 ) or flag:
+                    if ( counts[i][HAVRUTA] < len(results[i][HAVRUTA]) and iteration < len(j) - 1 ) or flag:
                         cell.text += results[i][HAVRUTA][counts[i][HAVRUTA]]
                         flag = not flag
                         counts[i][HAVRUTA] += 1
@@ -269,16 +280,15 @@ class Word:
                         cell.text += results[i][MITUTA][counts[i][MITUTA]]
                         counts[i][MITUTA] += 1
                     cell.paragraphs[0].runs[0].font.size = Pt(12)
-                    counter += 1
 
     def save(self):
-        if not exists(RESULTS_FOLDER):
-            mkdir(RESULTS_FOLDER)
+        if not os.path.exists(RESULTS_FOLDER):
+            os.mkdir(RESULTS_FOLDER)
         self.doc.save(f'{RESULTS_FOLDER}/{datetime.now().strftime("%d-%m-%Y_%H-%M-%S")}.docx')
 
 
 if __name__ == '__main__':
-    if not exists(TEMPLATE_FILE) or not exists(XL_NAME):
+    if not os.path.exists(TEMPLATE_FILE) or not os.path.exists(XL_NAME):
         Tkinter.show(True, 'חסרים לך קבצים (צריך שיהיה לך: template.docx, תורנים.xlsx)')
     else:
         Tkinter.start()
