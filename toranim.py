@@ -27,8 +27,8 @@ TABLE_CELLS = '''15 16 17 24 25
 13 14 22 23
 40 41 49 50'''.split('\n')
 
-REGULAR = MITUTA = 0
-SHISHI = HAVRUTA = 1
+REGULAR = MITUTA = INFO = 0
+SHISHI = HAVRUTA = ERROR = 1
 
 
 class Excel:
@@ -113,7 +113,7 @@ class Tkinter:
     
     @classmethod
     def get_sums(cls):
-        if cls.strvar_nums:
+        if cls.strvar_nums: # special sevev
             int_nums = cls.get_int_counts()
             shishis_sum = sum([int_nums[i] for i in SHISHI_INDEX])
             rest_sum = sum(int_nums) - shishis_sum
@@ -127,7 +127,7 @@ class Tkinter:
 
     @classmethod
     def show(cls, type, msg):
-        if type:
+        if type == ERROR:
             mb.showerror('קרתה תקלה', msg)
         else:
             mb.showinfo('כל הכבוד', msg)
@@ -136,12 +136,12 @@ class Tkinter:
     def restore(cls):
         xl_folder, word_foler = glob(VERSIONS_FOLDER + '/*'), glob(RESULTS_FOLDER + '/*')
         if not xl_folder or not word_foler:
-            cls.show(True, "אין לך מה לשחזר")
+            cls.show(ERROR, "אין לך מה לשחזר")
         else:
             os.remove(XL_NAME)
             os.remove(max(word_foler, key=os.path.getctime)) # latest file in folder
             os.rename(max(xl_folder, key=os.path.getctime), XL_NAME)
-            cls.show(False, 'שוחזר בהצלחה')
+            cls.show(INFO, 'שוחזר בהצלחה')
 
 class Calculate:
     def __init__(self):
@@ -156,13 +156,13 @@ class Calculate:
         min_shishi = min([i[SHISHI] for i in self.toranim.values()])
         min_regular = min([i[REGULAR] for i in self.toranim.values()])
         for i in self.toranim:
-            if type:
+            if type == SHISHI:
                 if self.toranim[i][REGULAR] == min_regular and self.toranim[i][SHISHI] == min_shishi:
                     res.append(i)
             else:
                 if self.toranim[i][REGULAR] == min_regular:
                     res.append(i)
-        if not res:
+        if not res: # if there's no one in united min list
             for i in self.toranim:
                 if self.toranim[i][SHISHI] == min_shishi:
                     res.append(i)
@@ -172,14 +172,14 @@ class Calculate:
         self.results[type][has_havruta].append(name)
         self.count[type] -= 1
         self.toranim[name][REGULAR] += 1
-        if type:
+        if type == SHISHI:
             self.toranim[name][SHISHI] += 1
         self.min_lists[type].remove(name)
 
     def add_last_toran(self, type):
         for i in self.get_min_list(type):
             if self.excel.get_havruta(i) == '':
-                self.add(i, False, type)
+                self.add(i, MITUTA, type)
                 return True
         return False
 
@@ -190,10 +190,10 @@ class Calculate:
             return
         havruta = self.excel.get_havruta(name)
         if havruta in self.min_lists[type]:
-            self.add(havruta, True, type)
-            self.add(name, True, type)
+            self.add(havruta, HAVRUTA, type)
+            self.add(name, HAVRUTA, type)
         else:
-            self.add(name, False, type)
+            self.add(name, MITUTA, type)
 
     def get_odd_count(self):
         if Tkinter.strvar_nums:
@@ -221,7 +221,7 @@ class Calculate:
         self.util(SHISHI)
         self.util(REGULAR)
         self.save_results()
-        Tkinter.show(False,
+        Tkinter.show(INFO,
         'התוצאה שמורה ב"תוצאות" והקובץ "תורנים" התעדכן. אם אתה רוצה להתחרט אז תיכנס שוב לתוכנה ותלחץ על "שחזר".')
         Tkinter.close()
 
@@ -289,6 +289,6 @@ class Word:
 
 if __name__ == '__main__':
     if not os.path.exists(TEMPLATE_FILE) or not os.path.exists(XL_NAME):
-        Tkinter.show(True, 'חסרים לך קבצים (צריך שיהיה לך: template.docx, תורנים.xlsx)')
+        Tkinter.show(ERROR, 'חסרים לך קבצים (צריך שיהיה לך: template.docx, תורנים.xlsx)')
     else:
         Tkinter.start()
