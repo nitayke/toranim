@@ -1,0 +1,4 @@
+xl_versions/*
+תוצאות/*
+dist/*
+!dist/toranim.exe
