@@ -1,3 +1,4 @@
+import sys
 import openpyxl
 import tkinter as tk
 from tkinter import ttk
@@ -37,15 +38,44 @@ class Excel:
         self.ws = self.wb.active
         self.toranim_data = {} # {name: [all, shishi]}
         self.havruta_data = []
+
+    def is_empty_cell(self, cell):
+        return cell.value is None
+
+    def has_empty_cell(self, range):
+        for cell in range:
+            if self.is_empty_cell(cell):
+                return True
+
+        return False
     
     def extract(self):
-        for i in self.ws['A2:D' + str(self.ws.max_row)]:
-            self.toranim_data[i[0].value] = [i[2].value, i[3].value] # regular and shishi
+        last_mituta = f'D{self.ws.max_row}'
+        if self.is_empty_cell(self.ws[last_mituta]):
+            Tkinter.show(ERROR, 
+                "יש בעיה באקסל, תבדוק שהוא ערוך כמו שצריך. כנראה שהבעיה היא שהכנסת לאקסל שורות נוספות מתחת לתלמיד האחרון בטור של השמות:(",
+                True)
+
+        first_mituta = 'A2'
+        for person in self.ws[f'{first_mituta}:{last_mituta}']:
+            cell_coordinate = person[0].coordinate
+            if self.has_empty_cell(person):
+                Tkinter.show(ERROR,
+                    f"יש בעיה באקסל, בשורה של התא\n {cell_coordinate}\n יש תא ריק. תמלא אותו ותנסה שוב",
+                    True)
+
+            name = person[0].value
+            regular_done = person[2].value
+            shishi_done = person[3].value
+            self.toranim_data[name] = [regular_done, shishi_done]
         
-        for i in self.ws['F2:G' + str(self.ws.max_row // 2)]:
-            if not i[0].value:
-                break
-            self.havruta_data.append([i[0].value, i[1].value])
+        first_havruta = 'F2'
+        last_havruta = f'G{self.ws.max_row // 2}'
+        for havruta in self.ws[f'{first_havruta}:{last_havruta}']:
+            if self.is_empty_cell(havruta[0]):
+                continue
+            self.havruta_data.append([havruta[0].value, havruta[1].value])
+            
         return self.havruta_data, self.toranim_data
 
     def get_havruta(self, name):
@@ -126,11 +156,15 @@ class Tkinter:
         cls.root.destroy()
 
     @classmethod
-    def show(cls, type, msg):
+    def show(cls, type, msg, close):
         if type == ERROR:
             mb.showerror('קרתה תקלה', msg)
         else:
             mb.showinfo('כל הכבוד', msg)
+        
+        if close:
+            cls.close()
+            sys.exit(0)
 
     @classmethod
     def restore(cls):
@@ -205,7 +239,7 @@ class Calculate:
     def util(self, type):
         self.min_lists[type] = self.get_min_list(type)
         if len(self.min_lists[type]) < self.count[type]:
-            for i in self.min_lists[type]:
+            for _ in self.min_lists[type]:
                 self.util1(type)
             self.min_lists[type] = self.get_min_list(type)
         while self.count[type] > 0:
