@@ -1,7 +1,7 @@
 import sys
 import openpyxl
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, IntVar
 import tkinter.messagebox as mb
 from docx import Document
 from docx.shared import Pt
@@ -15,8 +15,10 @@ TEMPLATE_FILE = 'template.docx'
 XL_NAME = 'תורנים.xlsx'
 TABLE_SIZE = 9 # x 9
 SHISHI_INDEX = (1, 4)
+
 # regular, shishi
-TABLE_CELLS = '''15 16 17 24 25
+TABLE_CELLS = '''\
+15 16 17 24 25
 11 12 20 21
 42 43 44 51 52
 38 39 47 48
@@ -28,9 +30,25 @@ TABLE_CELLS = '''15 16 17 24 25
 13 14 22 23
 40 41 49 50'''.split('\n')
 
-REGULAR = MITUTA = INFO = 0
-SHISHI = HAVRUTA = ERROR = 1
+# regular, shishi
+KAITZ_CELLS = '''\
+15 16 24 25
+11 12 20
+42 43 51 52
+38 39 47
+36 37 45
+67 68 76
+65 66 74
+63 64 72
 
+13 14 22
+40 41 49'''.split('\n')
+
+REGULAR = MITUTA = INFO = ZMAN_HOREF = 0
+SHISHI = HAVRUTA = ERROR = ZMAN_KAITZ = 1
+
+HOREF_NUM = 4
+KAITZ_NUM = 3
 
 class Excel:
     def __init__(self):
@@ -52,17 +70,13 @@ class Excel:
     def extract(self):
         last_mituta = f'D{self.ws.max_row}'
         if self.is_empty_cell(self.ws[last_mituta]):
-            Tkinter.show(ERROR, 
-                "יש בעיה באקסל, תבדוק שהוא ערוך כמו שצריך. כנראה שהבעיה היא שהכנסת לאקסל שורות נוספות מתחת לתלמיד האחרון בטור של השמות:(",
-                True)
+            Errors.fatal("יש בעיה באקסל, תבדוק שהוא ערוך כמו שצריך. כנראה שהבעיה היא שהכנסת לאקסל שורות נוספות מתחת לתלמיד האחרון בטור של השמות")
 
         first_mituta = 'A2'
         for person in self.ws[f'{first_mituta}:{last_mituta}']:
             cell_coordinate = person[0].coordinate
             if self.has_empty_cell(person):
-                Tkinter.show(ERROR,
-                    f"יש בעיה באקסל, בשורה של התא\n {cell_coordinate}\n יש תא ריק. תמלא אותו ותנסה שוב",
-                    True)
+                Errors.fatal(f"יש בעיה באקסל, בשורה של התא\n {cell_coordinate}\n יש תא ריק. תמלא אותו ותנסה שוב")
 
             name = person[0].value
             regular_done = person[2].value
@@ -95,9 +109,17 @@ class Excel:
             self.ws.cell(i+2, 4).value = toranim_data[name][SHISHI]
         self.wb.save(XL_NAME)
 
-
-class Tkinter:
+class Tkinter:        
+    zman = None
     strvar_nums = []
+
+    @classmethod
+    def is_special_sevev(cls):
+        return cls.strvar_nums
+
+    @classmethod
+    def is_zman_horef(cls):
+        return cls.zman.get() == ZMAN_HOREF
 
     @classmethod
     def start(cls):
@@ -105,6 +127,11 @@ class Tkinter:
         cls.root.title('שיבוץ תורנים')
         frame = tk.Frame(cls.root, padx=60, pady=60)
         frame.pack()
+
+        cls.zman = IntVar(value=ZMAN_HOREF)
+        ttk.Radiobutton(frame, text="זמן אלול / חורף", value=ZMAN_HOREF, var=cls.zman).pack(anchor='w')
+        ttk.Radiobutton(frame, text="זמן קיץ", value=ZMAN_KAITZ, var=cls.zman).pack(anchor='w')
+
         ttk.Button(frame, text='סבב רגיל', command=lambda: Calculate().calculate()).pack()
         ttk.Button(frame, text='סבב מיוחד', command=cls.special_sevev).pack()
         ttk.Button(frame, text='שחזר פעם אחרונה', command=cls.restore).pack()
@@ -134,7 +161,8 @@ class Tkinter:
                 frame1 = tk.Frame(frame)
                 frame1.grid(row=j+1, column=i)
                 cls.strvar_nums[j*4+i] = tk.StringVar()
-                cls.strvar_nums[j*4+i].set(str(4 + int(i==0)))
+                toranim_num = HOREF_NUM if Tkinter.is_zman_horef() else KAITZ_NUM
+                cls.strvar_nums[j*4+i].set(str(toranim_num + int(i==0)))
                 spinbox=tk.Spinbox(frame1, from_=0, to=50, textvariable=cls.strvar_nums[j*4+i])
                 spinbox.pack()
     
@@ -143,34 +171,32 @@ class Tkinter:
     
     @classmethod
     def get_sums(cls):
-        if cls.strvar_nums: # special sevev
+        if cls.is_special_sevev():
             int_nums = cls.get_int_counts()
             shishis_sum = sum([int_nums[i] for i in SHISHI_INDEX])
             rest_sum = sum(int_nums) - shishis_sum
             return [rest_sum, shishis_sum]
+        elif cls.zman.get() == ZMAN_KAITZ:
+            return [26, 6] # rest: ((3 + 3 + 4) * 3 - 4), shishis: (3 * 2)
         else:
-            return [34, 8]
+            return [34, 8] # rest: ((4 + 4 + 5) * 3 - 5), shishis: (4 * 2)
 
     @classmethod
     def close(cls):
         cls.root.destroy()
 
     @classmethod
-    def show(cls, type, msg, close):
+    def show(cls, type, msg):
         if type == ERROR:
             mb.showerror('קרתה תקלה', msg)
         else:
             mb.showinfo('כל הכבוד', msg)
-        
-        if close:
-            cls.close()
-            sys.exit(0)
 
     @classmethod
     def restore(cls):
         xl_folder, word_foler = glob(VERSIONS_FOLDER + '/*'), glob(RESULTS_FOLDER + '/*')
         if not xl_folder or not word_foler:
-            cls.show(ERROR, "אין לך מה לשחזר")
+            Errors.warning("אין לך מה לשחזר")
         else:
             os.remove(XL_NAME)
             os.remove(max(word_foler, key=os.path.getctime)) # latest file in folder
@@ -230,11 +256,13 @@ class Calculate:
             self.add(name, MITUTA, type)
 
     def get_odd_count(self):
-        if Tkinter.strvar_nums:
+        if Tkinter.is_special_sevev():
             nums = Tkinter.get_int_counts()
             self.odds_count = sum([i % 2 for i in nums])
+        elif Tkinter.is_zman_horef():
+            self.odds_count = 2 # shabat = 5, 2 shabattot
         else:
-            self.odds_count = 2
+            self.odds_count = 8 # everyday = 8, 9 times
 
     def util(self, type):
         self.min_lists[type] = self.get_min_list(type)
@@ -266,7 +294,6 @@ class Calculate:
         word.save()
         self.excel.update(self.toranim)
 
-
 class Word:
     def __init__(self):
         self.doc = Document('template.docx')
@@ -275,11 +302,14 @@ class Word:
     def update_table_cells(self):
         self.table_cells = [[], []] # regular, shishi
         index = REGULAR
-        for i in TABLE_CELLS:
+
+        index_table_cells = TABLE_CELLS if Tkinter.is_zman_horef() else KAITZ_CELLS
+        for i in index_table_cells:
             if i == '':
                 index = SHISHI
                 continue
             self.table_cells[index].append([int(i) for i in i.split(' ')])
+
         if Tkinter.strvar_nums: # special sevev
             int_counts = Tkinter.get_int_counts()
             shishi_counts = [int_counts[i] for i in SHISHI_INDEX]
@@ -298,7 +328,7 @@ class Word:
 
     def fill_table(self, results):
         counts = [[0, 0], [0, 0]] # regular [lonely, havruta], shishi [lonely, havruta]
-        for i in range(len(self.table_cells)): # 2 iterations - regular and shishi
+        for i in range(2): # 2 iterations - regular and shishi
             for j in self.table_cells[i]: # over groups.
                 flag = False
                 for iteration, k in enumerate(j):
@@ -320,9 +350,20 @@ class Word:
             os.mkdir(RESULTS_FOLDER)
         self.doc.save(f'{RESULTS_FOLDER}/{datetime.now().strftime("%d-%m-%Y_%H-%M-%S")}.docx')
 
+class Errors:
+    @classmethod
+    def fatal(cls, msg):
+        Tkinter.show(ERROR, msg)
+        Tkinter.close()
+        sys.exit(0)
+
+    @classmethod
+    def warning(cls, msg):
+        Tkinter.show(ERROR, msg)
+        
 
 if __name__ == '__main__':
     if not os.path.exists(TEMPLATE_FILE) or not os.path.exists(XL_NAME):
-        Tkinter.show(ERROR, 'חסרים לך קבצים (צריך שיהיה לך: template.docx, תורנים.xlsx)')
+        Errors.fatal('חסרים לך קבצים (צריך שיהיה לך: template.docx, תורנים.xlsx)')
     else:
         Tkinter.start()
