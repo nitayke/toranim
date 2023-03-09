@@ -1,7 +1,7 @@
 import sys
 import openpyxl
 import tkinter as tk
-from tkinter import ttk, IntVar
+from tkinter import ttk, IntVar, StringVar
 import tkinter.messagebox as mb
 from docx import Document
 from docx.shared import Pt
@@ -44,6 +44,14 @@ KAITZ_CELLS = '''\
 13 14 22
 40 41 49'''.split('\n')
 
+shiurim = {
+    'א': '1',
+    'ב': '2',
+    'ג': '3',
+    'ד': '4',
+    'ה': '5',
+}
+
 REGULAR = MITUTA = INFO = ZMAN_HOREF = 0
 SHISHI = HAVRUTA = ERROR = ZMAN_KAITZ = 1
 
@@ -84,7 +92,7 @@ class Excel:
             self.toranim_data[name] = [regular_done, shishi_done]
         
         first_havruta = 'F2'
-        last_havruta = f'G{self.ws.max_row // 2}'
+        last_havruta = f'G{self.ws.max_row}'
         for havruta in self.ws[f'{first_havruta}:{last_havruta}']:
             if self.is_empty_cell(havruta[0]):
                 continue
@@ -99,6 +107,45 @@ class Excel:
             elif name == i[1]:
                 return i[0]
         return ''
+
+    def get_sorted_row(self, name, shiur):
+        max_row = self.ws.max_row
+        for row in range(2, max_row + 1): # first toran row is 2
+            row_name = self.ws[f'A{row}'].value
+            row_shiur = str(self.ws[f'B{row}'].value)            
+            if row_shiur > shiur or (row_shiur == shiur and row_name > name):
+                break
+        else:
+            row = max_row + 1
+        self.ws.insert_rows(row)
+        return row
+
+    def add_person(self, name, shiur):
+        last_person_name = f'A{self.ws.max_row}'
+        if self.is_empty_cell(self.ws[last_person_name]):
+            Errors.fatal("יש בעיה באקסל, תבדוק שהוא ערוך כמו שצריך. כנראה שהבעיה היא שהכנסת לאקסל שורות נוספות מתחת לתלמיד האחרון בטור של השמות")
+        if shiur not in shiurim.keys():
+            Errors.warning("אנא הכנס שיעור בין א-ה")
+            return
+        
+        def key_func(cell):
+            if isinstance(cell.value, int) or (isinstance(cell.value, str) and cell.value.isdigit()):
+                return cell.value
+            else:
+                Errors.fatal(f"יש טעות באקסל במספר התורנויות בתא\n{cell.coordinate}\nתקן את הטעות ונסה שנית")
+        max_regular_cell = max(self.ws['C'][1:], key=key_func)
+        max_shishi_cell = max(self.ws['D'][1:], key=key_func)
+        
+        shiur_number = shiurim[shiur]
+        row_to_insert = self.get_sorted_row(name, shiur_number)
+
+        self.ws[f'A{row_to_insert}'] = name
+        self.ws[f'B{row_to_insert}'] = shiur_number
+        self.ws[f'C{row_to_insert}'] = max_regular_cell.value
+        self.ws[f'D{row_to_insert}'] = max_shishi_cell.value
+
+        self.wb.save(XL_NAME)
+        Tkinter.show(INFO, f'הוספת את {name} משיעור {shiur} בהצלחה')
     
     def update(self, toranim_data):
         if not os.path.exists(VERSIONS_FOLDER):
@@ -135,7 +182,47 @@ class Tkinter:
         ttk.Button(frame, text='סבב רגיל', command=lambda: Calculate().calculate()).pack()
         ttk.Button(frame, text='סבב מיוחד', command=cls.special_sevev).pack()
         ttk.Button(frame, text='שחזר פעם אחרונה', command=cls.restore).pack()
+        ttk.Button(frame, text='הוסף בחור ישיבה', command=cls.add_person_dialog).pack()
         cls.root.mainloop()
+
+    @classmethod
+    def add_person_dialog(cls):
+        dialog = tk.Toplevel(cls.root)
+        dialog.title("הוסף בחור ישיבה")
+        dialog.geometry("300x150")
+
+        name_var = StringVar()
+        shiur_var = StringVar()
+
+        name_label = ttk.Label(dialog, text="הכנס שם מלא:")
+        name_label.grid(column=0, row=0, padx=5, pady=5)
+        name_entry = ttk.Entry(dialog, textvariable=name_var)
+        name_entry.grid(column=1, row=0, padx=5, pady=5)
+
+        options = list(shiurim.keys())
+        shiur_var.set(options[0])
+        shiur_label = ttk.Label(dialog, text="בחר שיעור עבור הבחור:")
+        shiur_label.grid(column=0, row=1, padx=5, pady=5)
+        shiur_dropdown = ttk.OptionMenu(dialog, shiur_var, *options)
+        shiur_dropdown.grid(column=1, row=1, padx=5, pady=5)
+
+        def submit_dialog():
+            name = name_var.get()
+            shiur = shiur_var.get()
+            if len(name.split()) < 2:
+                Errors.warning("נא להכניס שתי מילים לפחות בשם המלא כדי שהתורן יוכל לדעת שזה הוא")
+            elif shiur not in shiurim.keys():
+                Errors.warning("נא לא להכניס בחור ישיבה משיעור שאינו מהשיעורים א-ה") 
+            else:
+                dialog.destroy()
+                Excel().add_person(name, shiur)
+
+        submit_button = ttk.Button(dialog, text="תכניס אותו לתורנות", command=submit_dialog)
+        submit_button.grid(column=0, row=2, columnspan=2, padx=5, pady=5)
+
+        dialog.transient(cls.root)
+        dialog.grab_set()
+        cls.root.wait_window(dialog)
 
     @classmethod
     def remove_frame(cls):
