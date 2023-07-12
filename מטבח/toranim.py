@@ -321,12 +321,15 @@ class Calculate:
         self.toranim[name][REGULAR] += 1
         if type == SHISHI:
             self.toranim[name][SHISHI] += 1
-        self.min_lists[type].remove(name)
+        if len(self.min_lists[type]) == 0:
+            Errors.warning(f"ייתכן שיש בעיה עם {name}, בדוק ליתר ביטחון")
+        else:
+            self.min_lists[type].remove(name)
 
     def add_last_toran(self, type):
-        for i in self.get_min_list(type):
-            if self.excel.get_havruta(i) == '':
-                self.add(i, MITUTA, type)
+        for name in self.get_min_list(type):
+            if self.excel.get_havruta(name) == '':
+                self.add(name, MITUTA, type)
                 return True
         return False
 
