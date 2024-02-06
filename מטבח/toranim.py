@@ -8,6 +8,7 @@ from docx.shared import Pt
 from datetime import datetime
 import os
 from glob import glob
+from random import shuffle
 
 VERSIONS_FOLDER = 'xl_versions'
 RESULTS_FOLDER = 'תוצאות'
@@ -75,7 +76,7 @@ class Excel:
 
         return False
     
-    def extract(self):
+    def extract(self, ignore_havrutot_and_shuffle):
         last_mituta = f'D{self.ws.max_row}'
         if self.is_empty_cell(self.ws[last_mituta]):
             Errors.fatal("יש בעיה באקסל, תבדוק שהוא ערוך כמו שצריך. כנראה שהבעיה היא שהכנסת לאקסל שורות נוספות מתחת לתלמיד האחרון בטור של השמות")
@@ -91,6 +92,12 @@ class Excel:
             shishi_done = person[3].value
             self.toranim_data[name] = [regular_done, shishi_done]
         
+        if ignore_havrutot_and_shuffle:
+            items = list(self.toranim_data.items())
+            shuffle(items)
+            self.toranim_data = dict(items)
+            return [], self.toranim_data
+
         first_havruta = 'F2'
         last_havruta = f'G{self.ws.max_row}'
         for havruta in self.ws[f'{first_havruta}:{last_havruta}']:
@@ -151,12 +158,17 @@ class Excel:
         if not os.path.exists(VERSIONS_FOLDER):
             os.mkdir(VERSIONS_FOLDER)
         self.wb.save(f'{VERSIONS_FOLDER}/{datetime.now().strftime("%d-%m-%Y_%H-%M-%S")}.xlsx')
-        for i, name in enumerate(toranim_data):
-            self.ws.cell(i+2, 3).value = toranim_data[name][REGULAR]
-            self.ws.cell(i+2, 4).value = toranim_data[name][SHISHI]
+        
+        rows_iterator = self.ws.iter_rows(min_row=2, min_col=1, max_col=4, values_only=True)
+        for index, row in enumerate(rows_iterator):
+            name = row[0]
+            if name in toranim_data:
+                self.ws.cell(index+2, 3).value = toranim_data[name][REGULAR]
+                self.ws.cell(index+2, 4).value = toranim_data[name][SHISHI]
         self.wb.save(XL_NAME)
 
-class Tkinter:        
+class Tkinter:
+    ignore_havrutot = None
     zman = None
     strvar_nums = []
 
@@ -174,16 +186,38 @@ class Tkinter:
         cls.root.title('שיבוץ תורנים')
         frame = tk.Frame(cls.root, padx=60, pady=60)
         frame.pack()
+        cls.generate_start_dialog(frame)
+        cls.root.mainloop()
+
+    @classmethod
+    def generate_start_dialog(cls, frame):
+        for widget in frame.winfo_children():
+            widget.destroy()
+
+        ttk.Button(frame, text='ייצור סבב חדש', command=lambda frame=frame: cls.generate_round_dialog(frame)).pack()
+        ttk.Button(frame, text='שחזר פעם אחרונה', command=cls.restore).pack()
+        ttk.Button(frame, text='הוסף בחור ישיבה', command=cls.add_person_dialog).pack()
+
+    @classmethod
+    def generate_round_dialog(cls, frame):
+        for widget in frame.winfo_children():
+            widget.destroy()
+
+        ttk.Button(frame, text='חזור', command=lambda frame=frame: cls.generate_start_dialog(frame)).pack(pady=(0, 20))
 
         cls.zman = IntVar(value=ZMAN_HOREF)
         ttk.Radiobutton(frame, text="זמן אלול / חורף", value=ZMAN_HOREF, var=cls.zman).pack(anchor='w')
         ttk.Radiobutton(frame, text="זמן קיץ", value=ZMAN_KAITZ, var=cls.zman).pack(anchor='w')
 
-        ttk.Button(frame, text='סבב רגיל', command=lambda: Calculate().calculate()).pack()
+        cls.ignore_havrutot = tk.BooleanVar(value=True)
+        ttk.Checkbutton(frame, text="התעלם מחברותות ובחר באקראי לפי תורנויות עבר", variable=cls.ignore_havrutot).pack(pady=15)
+
+        ttk.Button(frame, text='סבב רגיל', command=cls.apply_calculation).pack()
         ttk.Button(frame, text='סבב מיוחד', command=cls.special_sevev).pack()
-        ttk.Button(frame, text='שחזר פעם אחרונה', command=cls.restore).pack()
-        ttk.Button(frame, text='הוסף בחור ישיבה', command=cls.add_person_dialog).pack()
-        cls.root.mainloop()
+
+    @classmethod
+    def apply_calculation(cls):
+        Calculate(cls.ignore_havrutot.get()).calculate()
 
     @classmethod
     def add_person_dialog(cls):
@@ -253,8 +287,7 @@ class Tkinter:
                 spinbox=tk.Spinbox(frame1, from_=0, to=50, textvariable=cls.strvar_nums[j*4+i])
                 spinbox.pack()
     
-        ttk.Button(cls.root, text='סבבה', command=lambda:
-         Calculate().calculate()).pack()
+        ttk.Button(cls.root, text='סבבה', command=cls.apply_calculation)
     
     @classmethod
     def get_sums(cls):
@@ -291,9 +324,9 @@ class Tkinter:
             cls.show(INFO, 'שוחזר בהצלחה')
 
 class Calculate:
-    def __init__(self):
+    def __init__(self, ignore_havrutot_and_shuffle=False):
         self.excel = Excel()
-        self.havrutot, self.toranim = self.excel.extract()
+        self.havrutot, self.toranim = self.excel.extract(ignore_havrutot_and_shuffle)
         self.results = [[[], []], [[], []]] # [regular: [lonely, havruta], shishi: [lonely, havruta]]
         self.count = [0, 0] # regular and shishi
         self.min_lists = [[], []] # regular and shishi
