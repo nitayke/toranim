@@ -181,29 +181,34 @@ class Tkinter:
         return cls.zman.get() == ZMAN_HOREF
 
     @classmethod
+    def new_frame(cls):
+        if len(cls.root.winfo_children()) > 0:
+            cls.root.winfo_children()[0].destroy()
+        frame = tk.Frame(cls.root, padx=60, pady=60)
+        frame.pack()
+        return frame
+
+    @classmethod
     def start(cls):
         cls.root = tk.Tk()
         cls.root.title('שיבוץ תורנים')
-        frame = tk.Frame(cls.root, padx=60, pady=60)
-        frame.pack()
-        cls.generate_start_dialog(frame)
+        cls.new_frame()
+        cls.generate_start_dialog()
         cls.root.mainloop()
 
     @classmethod
-    def generate_start_dialog(cls, frame):
-        for widget in frame.winfo_children():
-            widget.destroy()
+    def generate_start_dialog(cls):
+        frame = cls.new_frame()
 
-        ttk.Button(frame, text='ייצור סבב חדש', command=lambda frame=frame: cls.generate_round_dialog(frame)).pack()
+        ttk.Button(frame, text='ייצור סבב חדש', command=cls.generate_round_dialog).pack()
         ttk.Button(frame, text='שחזר פעם אחרונה', command=cls.restore).pack()
         ttk.Button(frame, text='הוסף בחור ישיבה', command=cls.add_person_dialog).pack()
 
     @classmethod
-    def generate_round_dialog(cls, frame):
-        for widget in frame.winfo_children():
-            widget.destroy()
+    def generate_round_dialog(cls):
+        frame = cls.new_frame()
 
-        ttk.Button(frame, text='חזור', command=lambda frame=frame: cls.generate_start_dialog(frame)).pack(pady=(0, 20))
+        ttk.Button(frame, text='חזור', command=cls.generate_start_dialog).pack(pady=(0, 20))
 
         cls.zman = IntVar(value=ZMAN_HOREF)
         ttk.Radiobutton(frame, text="זמן אלול / חורף", value=ZMAN_HOREF, var=cls.zman).pack(anchor='w')
@@ -259,18 +264,12 @@ class Tkinter:
         cls.root.wait_window(dialog)
 
     @classmethod
-    def remove_frame(cls):
-        cls.root.winfo_children()[0].destroy()
-
-    @classmethod
     def get_int_counts(cls):
         return [int(i.get()) for i in cls.strvar_nums if i]
     
     @classmethod
     def special_sevev(cls):
-        cls.remove_frame()
-        frame = tk.Frame(cls.root, padx=60, pady=60)
-        frame.pack()
+        frame = cls.new_frame()
 
         DAYS = ['ראשון-שני', 'שלישי-רביעי', 'חמישי-שישי', 'שבת']
         cls.strvar_nums = [0] * 12
@@ -287,7 +286,7 @@ class Tkinter:
                 spinbox=tk.Spinbox(frame1, from_=0, to=50, textvariable=cls.strvar_nums[j*4+i])
                 spinbox.pack()
     
-        ttk.Button(cls.root, text='סבבה', command=cls.apply_calculation)
+        ttk.Button(cls.root, text='סבבה', command=cls.apply_calculation).pack()
     
     @classmethod
     def get_sums(cls):
